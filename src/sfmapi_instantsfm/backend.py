@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -197,60 +196,6 @@ class InstantSfMBackend:
         if command is None:
             raise NotFoundError(f"Backend action {action_id!r} not found")
         return self._run_command(command, normalized, progress=progress)
-
-    def extract_features(self, **_: Any) -> dict:
-        raise self._unsupported("features.extract", "Use instantsfm.extractFeatures")
-
-    def match(self, **_: Any) -> dict:
-        raise self._unsupported("matches.exhaustive", "Use instantsfm.extractFeatures")
-
-    def verify_matches(self, **_: Any) -> dict:
-        raise self._unsupported("matches.verify", "Use instantsfm.extractFeatures")
-
-    def read_keypoints(self, **_: Any) -> tuple[list[list[float]], bytes, int]:
-        raise self._unsupported("observations.by_image", "InstantSfM does not expose keypoints")
-
-    def iter_two_view_geometries(self, **_: Any) -> Iterable[tuple[int, int, Any]]:
-        raise self._unsupported("matches.verify", "InstantSfM does not expose pair geometry")
-
-    def iter_correspondences(self, **_: Any) -> Iterable[tuple[int, int, Any]]:
-        raise self._unsupported("matches.exhaustive", "InstantSfM does not expose raw matches")
-
-    def run_mapping(self, **_: Any) -> tuple[list[dict], list[Any]]:
-        raise self._unsupported("map.global", "Use instantsfm.runGlobalSfm")
-
-    def bundle_adjustment(self, **_: Any) -> dict:
-        raise self._unsupported("ba.standard", "InstantSfM owns BA internally")
-
-    def triangulate(self, **_: Any) -> dict:
-        raise self._unsupported("triangulate.retri", "InstantSfM owns triangulation internally")
-
-    def relocalize(self, **_: Any) -> dict:
-        raise self._unsupported("relocalize.images")
-
-    def pose_graph_optimize(self, **_: Any) -> dict:
-        raise self._unsupported("pgo.optimize")
-
-    def export(self, **_: Any) -> dict:
-        raise self._unsupported("export.colmap_text", "Use instantsfm.runGlobalSfm with export_txt")
-
-    def convert_spherical_to_cubemap(self, **_: Any) -> dict:
-        raise self._unsupported("spherical.to_cubemap")
-
-    def render_spherical_cubemap_images(self, **_: Any) -> dict:
-        raise self._unsupported("spherical.render_cubemap")
-
-    def build_vlad_index(self, **_: Any) -> tuple[list[str], Any]:
-        raise self._unsupported("similarity.vlad")
-
-    def localize_from_memory(self, **_: Any) -> dict:
-        raise self._unsupported("localize.from_memory")
-
-    def apply_sim3(self, **_: Any) -> dict:
-        raise self._unsupported("georegister.sim3")
-
-    def read_reconstruction(self, path: Path) -> Any:
-        raise self._unsupported("import.colmap", f"Use sfmapi import tools for model path: {path}")
 
     def _find_root(self) -> Path | None:
         if self._root_override is not None:
@@ -608,9 +553,6 @@ class InstantSfMBackend:
             progress.phase_progress(f"instantsfm.{phase}", current=current, total=total)
         except Exception:
             return
-
-    def _unsupported(self, capability: str, reason: str = "") -> CapabilityUnavailableError:
-        return CapabilityUnavailableError(capability=capability, reason=reason)
 
 
 __all__ = [
