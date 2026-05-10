@@ -1,0 +1,3 @@
+[submodule "third_party/instantsfm"]
+	path = third_party/instantsfm
+	url = https://github.com/cre185/InstantSfM.git
