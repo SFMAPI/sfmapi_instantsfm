@@ -1,5 +1,5 @@
 """ASGI entrypoint that registers the InstantSfM backend before sfmapi starts."""
-# ruff: noqa: E402,I001
+# ruff: noqa: E402
 
 from __future__ import annotations
 
@@ -13,11 +13,13 @@ os.environ.setdefault("SFMAPI_QUEUE_BACKEND", "inline")
 os.environ.setdefault("SFMAPI_INLINE_TASKS", "true")
 
 from sfmapi_instantsfm.backend import configure_instantsfm_environment
+from sfmapi_instantsfm.plugin import plugin
 
 configure_instantsfm_environment(validate=bool(os.environ.get("SFMAPI_INSTANTSFM_ROOT")))
 
-import sfmapi_instantsfm  # noqa: F401 - import side effect registers backend
-
+from app.adapters.registry import register_backend
 from app.main import create_app
+
+plugin.register(register_backend)
 
 app = create_app()
