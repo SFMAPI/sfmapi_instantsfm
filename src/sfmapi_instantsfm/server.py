@@ -17,8 +17,7 @@ from sfmapi_instantsfm.plugin import plugin
 
 configure_instantsfm_environment(validate=bool(os.environ.get("SFMAPI_INSTANTSFM_ROOT")))
 
-from app.adapters.registry import register_backend
-from app.main import create_app
+from sfmapi.runtime import create_app, register_backend
 
 plugin.register(register_backend)
 
