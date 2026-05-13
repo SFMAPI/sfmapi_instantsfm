@@ -71,3 +71,10 @@ uv run ruff check src tests
 
 The default tests mock subprocess execution and do not require CUDA, COLMAP, or InstantSfM dependencies.
 
+## License
+
+The sfmapi wrapper code is licensed under `AGPL-3.0-or-later`; see `LICENSE`.
+Upstream InstantSfM is included as a submodule under `third_party/instantsfm`
+and remains `CC-BY-NC-4.0`; see `LICENSES/InstantSfM-CC-BY-NC-4.0.txt` and
+`THIRD_PARTY_NOTICES.md`. The upstream license is noncommercial, so confirm
+terms before commercial use or redistribution.
