@@ -37,15 +37,15 @@ class PluginManifestDict(TypedDict):
 
 manifest: PluginManifestDict = {
     "plugin_id": "instantsfm",
-    "display_name": "InstantSFM",
-    "description": "Backend plugin for Python-based InstantSFM workflows.",
+    "display_name": "InstantSfM",
+    "description": "Backend plugin for Python-based InstantSfM workflows.",
     "package_name": "sfmapi-instantsfm",
     "github_url": "https://github.com/SFMAPI/sfmapi_instantsfm.git",
     "entry_points": ["sfmapi_instantsfm.plugin:plugin"],
     "providers": [
         {
             "provider_id": "instantsfm",
-            "display_name": "InstantSFM",
+            "display_name": "InstantSfM",
             "capabilities": [
                 "features.extract.superpoint",
                 "pairs.retrieval",
@@ -81,9 +81,9 @@ manifest: PluginManifestDict = {
     "licenses": [{"name": "AGPL-3.0-or-later"}],
     "upstream_projects": [
         {
-            "name": "InstantSFM",
-            "url": "https://github.com/SFMAPI/InstantSFM",
-            "license": "Upstream license",
+            "name": "InstantSfM",
+            "url": "https://github.com/cre185/InstantSfM",
+            "license": "CC-BY-NC-4.0",
         }
     ],
     "compatibility": {
