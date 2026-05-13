@@ -117,7 +117,7 @@ def configure_instantsfm_environment(
 
 class InstantSfMBackend:
     name = "instantsfm"
-    version = "0.2.0"
+    version = "0.0.1"
     vendor = "InstantSfM"
 
     def __init__(
