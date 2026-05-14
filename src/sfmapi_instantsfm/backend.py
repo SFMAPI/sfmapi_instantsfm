@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -61,7 +62,11 @@ INSTANTSFM_COMMANDS: tuple[InstantSfMCommand, ...] = (
     InstantSfMCommand(
         "instantsfm.trainGaussianSplatting",
         "InstantSfM 3DGS training",
-        "dense",
+        # 3DGS training produces a radiance field, not a dense MVS mesh /
+        # point cloud. The category label is descriptive only -- 3DGS
+        # training is still exposed as a backend action, not a portable
+        # sfmapi capability.
+        "radiance_field",
         "instantsfm.scripts.gs",
         "Train the optional Gaussian Splatting viewer output.",
     ),
@@ -132,7 +137,22 @@ class InstantSfMBackend:
         )
 
     def capabilities(self) -> set[str]:
-        return set()
+        """Portable sfmapi capabilities backed by real wrapper methods.
+
+        InstantSfM is a *global* SfM engine. ``run_mapping`` wraps
+        ``instantsfm.scripts.sfm`` (which emits standard COLMAP
+        ``cameras.bin`` / ``images.bin`` / ``points3D.bin``) behind a
+        path-staging adapter, so the portable ``map.global`` stage is
+        advertised. Feature extraction stays action-only: InstantSfM's
+        ``scripts.feat`` fuses extraction + matching into one
+        whole-project ``GenerateDatabase`` call with no separable
+        extract / pairs / match stages. The set is empty until the
+        InstantSfM checkout is resolvable -- a capability the deployment
+        cannot actually run must not be advertised.
+        """
+        if self._find_root() is None:
+            return set()
+        return {"map.global"}
 
     def runtime_versions(self) -> dict[str, str]:
         root = self._find_root()
@@ -196,6 +216,183 @@ class InstantSfMBackend:
         if command is None:
             raise NotFoundError(f"Backend action {action_id!r} not found")
         return self._run_command(command, normalized, progress=progress)
+
+    # ------------------------------------------------------------------
+    # Portable sfmapi mapping stage (map.global).
+    #
+    # InstantSfM's ``scripts.sfm`` hard-codes a ``<data_path>/{images,
+    # database.db,sparse}`` project layout (see controllers.data_reader.
+    # ReadData). sfmapi instead supplies independent db / image / sparse
+    # paths, so this wrapper stages a temp directory whose ``database.db``
+    # and ``images`` entries link to the caller's paths, runs InstantSfM
+    # against that staged root, then reads the COLMAP sparse model back
+    # out of ``<tmp>/sparse/0``.
+    # ------------------------------------------------------------------
+
+    def run_mapping(
+        self,
+        *,
+        kind: str,
+        db_path: Path,
+        image_root: Path,
+        sparse_root: Path,
+        job_dir: Path,
+        spec: dict[str, Any],
+        pose_priors: dict[str, Any] | None = None,
+        progress: Any | None = None,
+    ) -> tuple[list[dict[str, Any]], list[Any]]:
+        """Run InstantSfM global mapping via a path-staging adapter.
+
+        Returns ``(summaries, reconstructions)`` to satisfy the portable
+        :class:`MappingBackend` protocol. InstantSfM emits a COLMAP
+        sparse model directory; reading it back into a portable
+        reconstruction object would need a reconstruction reader this
+        wrapper does not implement, so the reconstruction list is left
+        empty and the summary carries the on-disk ``model_path`` -- the
+        same shape the SphereSfM backend's ``run_mapping`` returns.
+        """
+        normalized = str(kind).replace("-", "_").lower()
+        if normalized != "global":
+            raise CapabilityUnavailableError(
+                capability=f"map.{kind}",
+                reason="InstantSfM only implements portable global mapping (map.global).",
+            )
+        self._require_root()
+        db_path = Path(db_path)
+        image_root = Path(image_root)
+        sparse_root = Path(sparse_root)
+        job_dir = Path(job_dir)
+        if not db_path.exists():
+            raise ValidationError(f"InstantSfM mapping input database not found: {db_path}")
+        if not image_root.exists():
+            raise ValidationError(f"InstantSfM mapping image root not found: {image_root}")
+        sparse_root.mkdir(parents=True, exist_ok=True)
+        job_dir.mkdir(parents=True, exist_ok=True)
+
+        # Stage <job_dir>/instantsfm_stage/{database.db,images} linking to
+        # the caller's paths so scripts.sfm sees its expected layout.
+        stage_root = job_dir / "instantsfm_stage"
+        if stage_root.exists():
+            shutil.rmtree(stage_root, ignore_errors=True)
+        stage_root.mkdir(parents=True, exist_ok=True)
+        staged_db = stage_root / "database.db"
+        staged_images = stage_root / "images"
+        db_link_mode = self._stage_link(db_path, staged_db)
+        images_link_mode = self._stage_link(image_root, staged_images)
+
+        module_args = ["--data_path", str(stage_root)]
+        spec = dict(spec or {})
+        if spec.get("export_txt") or spec.get("export_text"):
+            module_args.append("--export_txt")
+        if spec.get("disable_depths"):
+            module_args.append("--disable_depths")
+        if spec.get("disable_semantics"):
+            module_args.append("--disable_semantics")
+        manual_config = spec.get("manual_config_name")
+        if manual_config:
+            module_args.extend(["--manual_config_name", str(manual_config)])
+
+        self._progress(progress, "global_mapping", 0, 1)
+        completed = self._run_python_module(
+            "instantsfm.scripts.sfm",
+            module_args,
+            timeout_seconds=spec.get("timeout_seconds"),
+        )
+        self._progress(progress, "global_mapping", 1, 1)
+
+        # InstantSfM's reconstruction_writer.ExportReconstruction writes
+        # the model into <data_path>/sparse/0.
+        staged_sparse = stage_root / "sparse"
+        produced = (
+            sorted(
+                (path for path in staged_sparse.iterdir() if path.is_dir()),
+                key=lambda path: path.name,
+            )
+            if staged_sparse.is_dir()
+            else []
+        )
+        summaries: list[dict[str, Any]] = []
+        for model_dir in produced:
+            # Move each staged sub-model under the caller's sparse_root so
+            # it outlives the staging directory.
+            dest = sparse_root / model_dir.name
+            if dest.exists():
+                shutil.rmtree(dest, ignore_errors=True)
+            shutil.move(str(model_dir), str(dest))
+            model_name = model_dir.name
+            summaries.append(
+                {
+                    "idx": int(model_name) if model_name.isdigit() else model_name,
+                    "model_path": str(dest),
+                    "engine": "instantsfm scripts.sfm",
+                }
+            )
+        # Clean up the staging directory (links + now-empty sparse dir).
+        shutil.rmtree(stage_root, ignore_errors=True)
+
+        if not summaries:
+            raise ValidationError(
+                "InstantSfM global mapping produced no sparse model under "
+                f"{staged_sparse} (stdout tail: {completed.stdout[-500:]!r})"
+            )
+        summaries[0].setdefault(
+            "command",
+            {
+                "module": "instantsfm.scripts.sfm",
+                "args": [
+                    str(self._python_executable),
+                    "-m",
+                    "instantsfm.scripts.sfm",
+                    *module_args,
+                ],
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+                "staging": {
+                    "stage_root": str(stage_root),
+                    "database_link_mode": db_link_mode,
+                    "images_link_mode": images_link_mode,
+                },
+            },
+        )
+        return summaries, []
+
+    def _stage_link(self, source: Path, link: Path) -> str:
+        """Link ``link`` -> ``source``, falling back to a copy.
+
+        Prefers a symlink (works for both files and directories on Linux
+        and on Windows when the process is allowed to create symlinks).
+        On Windows without that privilege, a directory junction is used
+        for directories; if every link strategy fails, the source is
+        copied. Returns the strategy used: ``symlink`` | ``junction`` |
+        ``copy``.
+        """
+        source = Path(source)
+        # 1. Symlink -- cross-platform, cheapest, works for files + dirs.
+        try:
+            link.symlink_to(source, target_is_directory=source.is_dir())
+            return "symlink"
+        except (OSError, NotImplementedError):
+            pass
+        # 2. Windows directory junction -- no special privilege required.
+        if os.name == "nt" and source.is_dir():
+            try:
+                subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(link), str(source)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return "junction"
+            except (OSError, subprocess.CalledProcessError):
+                pass
+        # 3. Copy fallback -- always works, just slower / uses disk.
+        if source.is_dir():
+            shutil.copytree(source, link)
+        else:
+            link.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, link)
+        return "copy"
 
     def _find_root(self) -> Path | None:
         if self._root_override is not None:

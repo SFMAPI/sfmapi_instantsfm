@@ -24,19 +24,31 @@ def test_action_catalog_exposes_instantsfm_actions(tmp_path: Path) -> None:
     assert "instantsfm.runGlobalSfm" in action_ids
     assert "instantsfm.runPipeline" in action_ids
     assert "instantsfm.runModule" in action_ids
-    assert backend.capabilities() == set()
+    # The fake checkout resolves, so the backend advertises its one
+    # portable capability (map.global, via the run_mapping adapter)
+    # alongside the action catalog.
+    assert backend.capabilities() == {"map.global"}
     extract = next(
         action for action in actions if action["action_id"] == "instantsfm.extractFeatures"
     )
     assert extract["input_schema"]["properties"]["feature_handler"]["enum"]
+    # 3DGS training is categorised as a radiance-field tool, not dense MVS.
+    gs = next(
+        action for action in actions if action["action_id"] == "instantsfm.trainGaussianSplatting"
+    )
+    assert gs["category"] == "radiance_field"
 
 
 def test_backend_contract_passes(tmp_path: Path) -> None:
     pytest.importorskip("sfmapi.backends")
-    from sfmapi.backends import Backend, SfmBackend, assert_backend_contract
+    from sfmapi.backends import Backend, MappingBackend, SfmBackend, assert_backend_contract
 
     backend = InstantSfMBackend(_fake_instantsfm(tmp_path / "InstantSfM"))
     assert isinstance(backend, Backend)
+    # InstantSfM satisfies the portable mapping protocol (run_mapping)
+    # but not the whole SfmBackend surface (no feature / observation /
+    # refinement / export / retrieval / localization methods).
+    assert isinstance(backend, MappingBackend)
     assert not isinstance(backend, SfmBackend)
     assert_backend_contract(backend)
 
@@ -91,6 +103,75 @@ def test_run_extract_features_builds_module_args(
         "colmap",
         "--single_camera",
     ]
+
+
+def test_run_mapping_global_stages_and_reads_back(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = _fake_instantsfm(tmp_path / "InstantSfM")
+    backend = InstantSfMBackend(root, python_executable="python")
+
+    db_path = tmp_path / "feature.db"
+    db_path.write_text("sqlite", encoding="utf-8")
+    image_root = tmp_path / "imgs"
+    image_root.mkdir()
+    (image_root / "a.jpg").write_text("", encoding="utf-8")
+    sparse_root = tmp_path / "out_sparse"
+    job_dir = tmp_path / "job"
+
+    captured: dict[str, object] = {}
+
+    def fake_run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        # InstantSfM scripts.sfm invocation -- emulate it writing a model
+        # into <data_path>/sparse/0.
+        if len(args) >= 3 and args[2] == "instantsfm.scripts.sfm":
+            captured["args"] = args
+            data_path = Path(args[args.index("--data_path") + 1])
+            model = data_path / "sparse" / "0"
+            model.mkdir(parents=True, exist_ok=True)
+            for name in ("cameras.bin", "images.bin", "points3D.bin"):
+                (model / name).write_text("", encoding="utf-8")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="done", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    summaries, reconstructions = backend.run_mapping(
+        kind="global",
+        db_path=db_path,
+        image_root=image_root,
+        sparse_root=sparse_root,
+        job_dir=job_dir,
+        spec={"export_txt": True},
+    )
+
+    assert reconstructions == []
+    assert len(summaries) == 1
+    # The model was moved out of the staging dir into sparse_root/0.
+    assert summaries[0]["model_path"] == str(sparse_root / "0")
+    assert (sparse_root / "0" / "cameras.bin").exists()
+    assert summaries[0]["engine"] == "instantsfm scripts.sfm"
+    args = captured["args"]
+    assert "--data_path" in args
+    assert "--export_txt" in args
+    # The staging directory is cleaned up after the model is recovered.
+    assert not (job_dir / "instantsfm_stage").exists()
+
+
+def test_run_mapping_rejects_non_global_kind(tmp_path: Path) -> None:
+    pytest.importorskip("sfmapi.errors")
+    from sfmapi.errors import CapabilityUnavailableError
+
+    backend = InstantSfMBackend(_fake_instantsfm(tmp_path / "InstantSfM"))
+    with pytest.raises(CapabilityUnavailableError):
+        backend.run_mapping(
+            kind="incremental",
+            db_path=tmp_path / "db",
+            image_root=tmp_path / "imgs",
+            sparse_root=tmp_path / "sparse",
+            job_dir=tmp_path / "job",
+            spec={},
+        )
 
 
 def test_run_pipeline_executes_ordered_steps(

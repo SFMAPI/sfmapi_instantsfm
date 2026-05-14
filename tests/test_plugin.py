@@ -42,3 +42,27 @@ def test_plugin_registers_backend_factory() -> None:
     factory = registered["instantsfm"]
     assert callable(factory)
     assert isinstance(factory(), InstantSfMBackend)
+
+
+def test_manifest_declares_map_global_capability(tmp_path: Path) -> None:
+    # InstantSfM is a *global* SfM engine. It backs exactly one portable
+    # capability -- `map.global` -- via the run_mapping path-staging
+    # adapter. Feature extraction stays action-only (fused extract+match
+    # in scripts.feat), and config schemas / artifact contracts stay
+    # empty until backed by real methods. Everything else is exposed via
+    # instantsfm.* backend actions.
+    manifest = get_plugin_manifest()
+    assert manifest["capabilities"] == ["map.global"]
+    assert manifest["providers"][0]["capabilities"] == ["map.global"]
+    assert manifest["config_schemas"] == []
+    assert manifest["artifact_contracts"] == []
+    assert manifest["backend_actions"] == ["instantsfm.*"]
+
+    # The backend agrees when the InstantSfM checkout is resolvable.
+    root = tmp_path / "InstantSfM"
+    (root / "instantsfm").mkdir(parents=True)
+    (root / "pyproject.toml").write_text("[project]\nname='instantsfm'\n", encoding="utf-8")
+    assert InstantSfMBackend(root).capabilities() == {"map.global"}
+
+    # ...and advertises nothing when the checkout cannot be found.
+    assert InstantSfMBackend(tmp_path / "missing").capabilities() == set()
