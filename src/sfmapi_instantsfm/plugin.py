@@ -38,7 +38,12 @@ class PluginManifestDict(TypedDict):
 manifest: PluginManifestDict = {
     "plugin_id": "instantsfm",
     "display_name": "InstantSfM",
-    "description": "Backend plugin for Python-based InstantSfM workflows.",
+    "description": (
+        "Demo / non-commercial only. Wraps upstream InstantSfM "
+        "(cre185/InstantSfM) which is CC-BY-NC-4.0; the wrapper + SDK "
+        "material here is AGPL-3.0-or-later. Excluded from sfmapi's "
+        "commercial / dual-license scope — do not use commercially."
+    ),
     "package_name": "sfmapi-instantsfm",
     "github_url": "https://github.com/SFMAPI/sfmapi_instantsfm.git",
     "entry_points": ["sfmapi_instantsfm.plugin:plugin"],

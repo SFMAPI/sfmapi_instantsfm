@@ -73,8 +73,20 @@ The default tests mock subprocess execution and do not require CUDA, COLMAP, or 
 
 ## License
 
-The sfmapi wrapper code is licensed under `AGPL-3.0-or-later`; see `LICENSE`.
-Upstream InstantSfM is included as a submodule under `third_party/instantsfm`
-and remains `CC-BY-NC-4.0`; see `LICENSES/InstantSfM-CC-BY-NC-4.0.txt` and
-`THIRD_PARTY_NOTICES.md`. The upstream license is noncommercial, so confirm
-terms before commercial use or redistribution.
+**Non-commercial / demo only.**
+
+- **Upstream InstantSfM** (`cre185/InstantSfM`, pulled as the git
+  submodule under `third_party/instantsfm`) is **CC-BY-NC-4.0** — a
+  *non-commercial* license. See `LICENSES/InstantSfM-CC-BY-NC-4.0.txt`
+  and `THIRD_PARTY_NOTICES.md`.
+- **All additional wrapper material and SDK code in this package** is
+  **AGPL-3.0-or-later**; see `LICENSE`. The published package ships
+  only this wrapper (`src/sfmapi_instantsfm/`) — it does **not**
+  redistribute the upstream submodule's source.
+
+Because the upstream is non-commercial, this plugin is **excluded from
+sfmapi's commercial / dual-license scope** (see `LICENSING.md` in the
+sfmapi server repo) and **must not be used for commercial purposes**.
+It exists as a demonstration of the action-catalog integration only.
+Running it for commercial advantage would breach upstream CC-BY-NC-4.0
+— that obligation is on the operator, not removed by this wrapper.
