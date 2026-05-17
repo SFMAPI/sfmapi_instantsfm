@@ -73,20 +73,30 @@ The default tests mock subprocess execution and do not require CUDA, COLMAP, or 
 
 ## License
 
-**Non-commercial / demo only.**
+The framing matters, so it is stated precisely:
 
-- **Upstream InstantSfM** (`cre185/InstantSfM`, pulled as the git
-  submodule under `third_party/instantsfm`) is **CC-BY-NC-4.0** — a
-  *non-commercial* license. See `LICENSES/InstantSfM-CC-BY-NC-4.0.txt`
-  and `THIRD_PARTY_NOTICES.md`.
-- **All additional wrapper material and SDK code in this package** is
-  **AGPL-3.0-or-later**; see `LICENSE`. The published package ships
-  only this wrapper (`src/sfmapi_instantsfm/`) — it does **not**
-  redistribute the upstream submodule's source.
+- **The wrapper + SDK material in this package is plain
+  `AGPL-3.0-or-later`, with no additional restrictions** (see
+  `LICENSE`). This package adds **no** non-commercial term — doing so
+  would be incoherent, since AGPLv3 §7 does not permit adding a
+  field-of-use restriction (the same reason CC-BY-NC and the GPL
+  family are incompatible). Use the wrapper under AGPL freely. The
+  published package ships only this wrapper (`src/sfmapi_instantsfm/`)
+  and references the upstream as a git submodule — it does **not**
+  redistribute the upstream source.
+- **Upstream InstantSfM** (`cre185/InstantSfM`, the
+  `third_party/instantsfm` submodule) is **`CC-BY-NC-4.0` —
+  non-commercial**. That limitation is **upstream's, not this
+  project's**, and it binds whoever *operates* InstantSfM. Wrapping it
+  neither adds nor removes that obligation. See
+  `LICENSES/InstantSfM-CC-BY-NC-4.0.txt` and `THIRD_PARTY_NOTICES.md`.
+- **sfmapi simply does not extend its commercial / dual license to
+  this plugin** (see `LICENSING.md` in the sfmapi server repo) — a
+  statement about the scope of sfmapi's *offer*, not a prohibition
+  imposed here. A commercial sfmapi license cannot usefully cover a
+  plugin whose upstream is non-commercial, so it doesn't.
 
-Because the upstream is non-commercial, this plugin is **excluded from
-sfmapi's commercial / dual-license scope** (see `LICENSING.md` in the
-sfmapi server repo) and **must not be used for commercial purposes**.
-It exists as a demonstration of the action-catalog integration only.
-Running it for commercial advantage would breach upstream CC-BY-NC-4.0
-— that obligation is on the operator, not removed by this wrapper.
+Net: the wrapper is unrestricted AGPL; whether you may run InstantSfM
+through it for commercial advantage is governed entirely by upstream
+`CC-BY-NC-4.0`, on you as the operator. This plugin exists as a
+demonstration of the action-catalog integration.

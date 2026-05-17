@@ -39,10 +39,11 @@ manifest: PluginManifestDict = {
     "plugin_id": "instantsfm",
     "display_name": "InstantSfM",
     "description": (
-        "Demo / non-commercial only. Wraps upstream InstantSfM "
-        "(cre185/InstantSfM) which is CC-BY-NC-4.0; the wrapper + SDK "
-        "material here is AGPL-3.0-or-later. Excluded from sfmapi's "
-        "commercial / dual-license scope — do not use commercially."
+        "Wrapper + SDK material is plain AGPL-3.0-or-later with no "
+        "added restrictions. Upstream InstantSfM (cre185/InstantSfM) "
+        "is CC-BY-NC-4.0; that non-commercial term is upstream's and "
+        "binds whoever runs InstantSfM, not added by sfmapi. sfmapi's "
+        "commercial/dual license does not extend to this plugin."
     ),
     "package_name": "sfmapi-instantsfm",
     "github_url": "https://github.com/SFMAPI/sfmapi_instantsfm.git",
